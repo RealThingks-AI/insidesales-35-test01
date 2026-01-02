@@ -621,17 +621,12 @@ export const ListView = ({
                       }}
                     >
                       {column.field === 'project_name' || column.field === 'deal_name' ? (
-                        <div className="flex items-center gap-2">
-                          <div className={`w-8 h-8 rounded-full ${getAvatarColor(deal[column.field as keyof Deal]?.toString() || '')} flex items-center justify-center text-white text-xs font-medium shrink-0`}>
-                            {getProjectInitials(deal[column.field as keyof Deal]?.toString() || '')}
-                          </div>
-                          <button 
-                            onClick={() => onDealClick(deal)}
-                            className="text-primary hover:underline font-medium text-left truncate"
-                          >
-                            <HighlightedText text={deal[column.field as keyof Deal]?.toString() || '-'} highlight={searchTerm} />
-                          </button>
-                        </div>
+                        <button 
+                          onClick={() => onDealClick(deal)}
+                          className="text-primary hover:underline font-medium text-left truncate"
+                        >
+                          <HighlightedText text={deal[column.field as keyof Deal]?.toString() || '-'} highlight={searchTerm} />
+                        </button>
                       ) : column.field === 'customer_name' ? (
                         <span className="truncate block">
                           <HighlightedText text={deal.customer_name || '-'} highlight={searchTerm} />

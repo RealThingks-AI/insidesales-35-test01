@@ -328,19 +328,14 @@ export const TaskListView = ({
                         />
                       </TableCell>
                       <TableCell className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <div className={`w-8 h-8 rounded-full ${getAvatarColor(task.title)} flex items-center justify-center text-white text-xs font-medium shrink-0`}>
-                            {getTaskInitials(task.title)}
-                          </div>
-                          <button
-                            onClick={() => setViewingTask(task)}
-                            className={`text-primary hover:underline font-medium text-left truncate ${
-                              task.status === 'completed' ? 'line-through text-muted-foreground' : ''
-                            }`}
-                          >
-                            <HighlightedText text={task.title} highlight={searchTerm} />
-                          </button>
-                        </div>
+                        <button
+                          onClick={() => setViewingTask(task)}
+                          className={`text-primary hover:underline font-medium text-left truncate ${
+                            task.status === 'completed' ? 'line-through text-muted-foreground' : ''
+                          }`}
+                        >
+                          <HighlightedText text={task.title} highlight={searchTerm} />
+                        </button>
                       </TableCell>
                       <TableCell className="px-4 py-3">
                         <Badge variant="outline" className={`whitespace-nowrap ${statusColors[task.status]}`}>

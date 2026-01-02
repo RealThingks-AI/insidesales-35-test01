@@ -679,21 +679,15 @@ export const ContactTable = forwardRef<ContactTableRef, ContactTableProps>(({
                         className="text-left px-4 py-3 align-middle whitespace-nowrap overflow-hidden text-ellipsis max-w-[200px]"
                       >
                         {column.field === 'contact_name' ? (
-                          <div className="flex items-center gap-2">
-                            {/* Contact Avatar */}
-                            <div className={`w-8 h-8 rounded-full ${getAvatarColor(contact.contact_name)} flex items-center justify-center text-white text-xs font-medium shrink-0`}>
-                              {getContactInitials(contact.contact_name)}
-                            </div>
-                            <button
-                              onClick={() => {
-                                setViewingContact(contact);
-                                setShowDetailModal(true);
-                              }}
-                              className="text-primary hover:underline font-medium text-left truncate"
-                            >
-                              <HighlightedText text={contact.contact_name} highlight={debouncedSearchTerm} />
-                            </button>
-                          </div>
+                          <button
+                            onClick={() => {
+                              setViewingContact(contact);
+                              setShowDetailModal(true);
+                            }}
+                            className="text-primary hover:underline font-medium text-left truncate"
+                          >
+                            <HighlightedText text={contact.contact_name} highlight={debouncedSearchTerm} />
+                          </button>
                         ) : column.field === 'company_name' || column.field === 'account_company_name' ? (
                           contact.account_company_name ? (
                             <button

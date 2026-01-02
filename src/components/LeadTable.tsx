@@ -694,17 +694,12 @@ const LeadTable = forwardRef<LeadTableRef, LeadTableProps>(({
                           className="text-left px-4 py-3 align-middle whitespace-nowrap overflow-hidden text-ellipsis max-w-[200px]"
                         >
                           {column.field === 'lead_name' ? (
-                            <div className="flex items-center gap-2">
-                              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-medium flex-shrink-0 ${getAvatarColor(lead.lead_name)}`}>
-                                {getLeadInitials(lead.lead_name)}
-                              </div>
-                              <button 
-                                onClick={() => handleViewLead(lead)} 
-                                className="text-primary hover:underline font-medium text-left truncate"
-                              >
-                                <HighlightedText text={lead.lead_name} highlight={debouncedSearchTerm} />
-                              </button>
-                            </div>
+                            <button 
+                              onClick={() => handleViewLead(lead)} 
+                              className="text-primary hover:underline font-medium text-left truncate"
+                            >
+                              <HighlightedText text={lead.lead_name} highlight={debouncedSearchTerm} />
+                            </button>
                           ) : column.field === 'account_company_name' ? (
                             <button 
                               onClick={() => {

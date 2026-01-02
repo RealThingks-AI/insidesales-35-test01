@@ -539,18 +539,12 @@ const AccountTable = forwardRef<AccountTableRef, AccountTableProps>(({
                       </div>
                     </TableCell>
                     {visibleColumns.map(column => <TableCell key={column.field} className="text-left px-4 py-3 align-middle whitespace-nowrap overflow-hidden text-ellipsis max-w-[200px]">
-                        {column.field === 'company_name' ? <div className="flex items-center gap-2">
-                            {/* Company Avatar */}
-                            <div className={`w-8 h-8 rounded-full ${getAvatarColor(account.company_name)} flex items-center justify-center text-white text-xs font-medium shrink-0`}>
-                              {getCompanyInitials(account.company_name)}
-                            </div>
-                            <button onClick={() => {
+                        {column.field === 'company_name' ? <button onClick={() => {
                     setViewingAccount(account);
                     setShowDetailModal(true);
                   }} className="text-primary hover:underline font-medium text-left truncate">
                               <HighlightedText text={account.company_name} highlight={searchTerm} />
-                            </button>
-                          </div> : column.field === 'account_owner' ? <span className="truncate block">
+                            </button> : column.field === 'account_owner' ? <span className="truncate block">
                             {account.account_owner ? displayNames[account.account_owner] || "Loading..." : <span className="block text-center w-full">-</span>}
                           </span> : column.field === 'status' ? (account.status ? <Badge variant="outline" className={`whitespace-nowrap ${getStatusBadgeClasses(account.status)}`}>
                             {account.status}

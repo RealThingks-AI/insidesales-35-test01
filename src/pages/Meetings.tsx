@@ -641,20 +641,15 @@ const Meetings = () => {
                         </TableCell>
                         {isColumnVisible('subject') && (
                           <TableCell className="px-4 py-3">
-                            <div className="flex items-center gap-2">
-                              <div className={`w-8 h-8 rounded-full ${getAvatarColor(meeting.subject)} flex items-center justify-center text-white text-xs font-medium shrink-0`}>
-                                {getMeetingInitials(meeting.subject)}
-                              </div>
-                              <button 
-                                onClick={() => {
-                                  setEditingMeeting(meeting);
-                                  setShowModal(true);
-                                }}
-                                className="text-primary hover:underline font-medium text-left truncate"
-                              >
-                                <HighlightedText text={meeting.subject} highlight={searchTerm} />
-                              </button>
-                            </div>
+                            <button 
+                              onClick={() => {
+                                setEditingMeeting(meeting);
+                                setShowModal(true);
+                              }}
+                              className="text-primary hover:underline font-medium text-left truncate"
+                            >
+                              <HighlightedText text={meeting.subject} highlight={searchTerm} />
+                            </button>
                           </TableCell>
                         )}
                         {isColumnVisible('date') && (
