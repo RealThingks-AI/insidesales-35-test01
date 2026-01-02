@@ -11,7 +11,9 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Search, Video, Trash2, Edit, Calendar, ArrowUpDown, ArrowUp, ArrowDown, List, CalendarDays, CheckCircle2, AlertCircle, UserX, CalendarClock, User, Columns, Upload, Download, X } from "lucide-react";
+import { Plus, Search, Video, Trash2, Edit, Calendar, ArrowUpDown, ArrowUp, ArrowDown, List, CalendarDays, CheckCircle2, AlertCircle, UserX, CalendarClock, User, Columns, Upload, Download, X, Eye } from "lucide-react";
+import { RowActionsDropdown } from "@/components/RowActionsDropdown";
+import { HighlightedText } from "@/components/shared/HighlightedText";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { MeetingsCalendarView } from "@/components/meetings/MeetingsCalendarView";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -314,18 +316,42 @@ const Meetings = () => {
   const isAllSelected = paginatedMeetings.length > 0 && paginatedMeetings.every(m => selectedMeetings.includes(m.id));
   const isSomeSelected = paginatedMeetings.some(m => selectedMeetings.includes(m.id)) && !isAllSelected;
 
+// Generate initials from subject
+  const getMeetingInitials = (subject: string) => {
+    return subject.split(' ').slice(0, 2).map(word => word.charAt(0).toUpperCase()).join('');
+  };
+
+  // Generate consistent color from subject
+  const getAvatarColor = (name: string) => {
+    const colors = ['bg-slate-500', 'bg-slate-600', 'bg-zinc-500', 'bg-gray-500', 'bg-stone-500', 'bg-neutral-500', 'bg-slate-700', 'bg-zinc-600'];
+    const index = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % colors.length;
+    return colors[index];
+  };
+
+  // Status badge styling matching Accounts module pattern
+  const getStatusBadgeClasses = (status: string) => {
+    switch (status) {
+      case 'scheduled':
+        return 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300 border-blue-200 dark:border-blue-800';
+      case 'ongoing':
+        return 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300 border-amber-200 dark:border-amber-800';
+      case 'completed':
+        return 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800';
+      case 'cancelled':
+        return 'bg-gray-100 text-gray-600 dark:bg-gray-800/30 dark:text-gray-400 border-gray-200 dark:border-gray-700';
+      default:
+        return 'bg-muted text-muted-foreground border-border';
+    }
+  };
+
   const getStatusBadge = (meeting: Meeting) => {
     const status = getEffectiveStatus(meeting);
-    if (status === "cancelled") {
-      return <Badge variant="destructive">Cancelled</Badge>;
-    }
-    if (status === "ongoing") {
-      return <Badge variant="secondary">Ongoing</Badge>;
-    }
-    if (status === "completed") {
-      return <Badge variant="outline">Completed</Badge>;
-    }
-    return <Badge variant="default">Scheduled</Badge>;
+    const label = status.charAt(0).toUpperCase() + status.slice(1);
+    return (
+      <Badge variant="outline" className={`whitespace-nowrap ${getStatusBadgeClasses(status)}`}>
+        {label}
+      </Badge>
+    );
   };
 
   const getOutcomeBadge = (outcome: string | null) => {
@@ -613,12 +639,24 @@ const Meetings = () => {
                             <Checkbox checked={selectedMeetings.includes(meeting.id)} onCheckedChange={checked => handleSelectMeeting(meeting.id, !!checked)} aria-label={`Select ${meeting.subject}`} />
                           </div>
                         </TableCell>
-                        <TableCell className="font-medium text-primary cursor-pointer hover:underline px-4 py-3" onClick={() => {
-                          setEditingMeeting(meeting);
-                          setShowModal(true);
-                        }}>
-                          {meeting.subject}
-                        </TableCell>
+                        {isColumnVisible('subject') && (
+                          <TableCell className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              <div className={`w-8 h-8 rounded-full ${getAvatarColor(meeting.subject)} flex items-center justify-center text-white text-xs font-medium shrink-0`}>
+                                {getMeetingInitials(meeting.subject)}
+                              </div>
+                              <button 
+                                onClick={() => {
+                                  setEditingMeeting(meeting);
+                                  setShowModal(true);
+                                }}
+                                className="text-primary hover:underline font-medium text-left truncate"
+                              >
+                                <HighlightedText text={meeting.subject} highlight={searchTerm} />
+                              </button>
+                            </div>
+                          </TableCell>
+                        )}
                         {isColumnVisible('date') && (
                           <TableCell className="text-sm px-4 py-3">
                             {format(new Date(meeting.start_time), 'dd/MM/yyyy')}
@@ -670,19 +708,37 @@ const Meetings = () => {
                           </TableCell>
                         )}
                         <TableCell className="w-20 px-4 py-3">
-                          <div className="flex items-center justify-center gap-1">
-                            <Button variant="ghost" size="icon" onClick={() => {
-                              setEditingMeeting(meeting);
-                              setShowModal(true);
-                            }}>
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" onClick={() => {
-                              setMeetingToDelete(meeting.id);
-                              setShowDeleteDialog(true);
-                            }}>
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
+                          <div className="flex items-center justify-center">
+                            <RowActionsDropdown
+                              actions={[
+                                {
+                                  label: "View",
+                                  icon: <Eye className="w-4 h-4" />,
+                                  onClick: () => {
+                                    setEditingMeeting(meeting);
+                                    setShowModal(true);
+                                  }
+                                },
+                                {
+                                  label: "Edit",
+                                  icon: <Edit className="w-4 h-4" />,
+                                  onClick: () => {
+                                    setEditingMeeting(meeting);
+                                    setShowModal(true);
+                                  }
+                                },
+                                {
+                                  label: "Delete",
+                                  icon: <Trash2 className="w-4 h-4" />,
+                                  onClick: () => {
+                                    setMeetingToDelete(meeting.id);
+                                    setShowDeleteDialog(true);
+                                  },
+                                  destructive: true,
+                                  separator: true
+                                }
+                              ]}
+                            />
                           </div>
                         </TableCell>
                       </TableRow>)}
