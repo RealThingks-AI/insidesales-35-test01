@@ -21,25 +21,19 @@ interface ContactColumnCustomizerProps {
   isSaving?: boolean;
 }
 
-// Updated default columns with all available fields
+// Updated default columns - removed redundant fields (region, industry, website are in Account; engagement metrics are in detail view)
 export const defaultContactColumns: ContactColumnConfig[] = [
   { field: 'contact_name', label: 'Contact Name', visible: true, order: 0 },
   { field: 'account_company_name', label: 'Company Name', visible: true, order: 1 },
   { field: 'position', label: 'Position', visible: true, order: 2 },
   { field: 'email', label: 'Email', visible: true, order: 3 },
   { field: 'phone_no', label: 'Phone', visible: true, order: 4 },
-  { field: 'region', label: 'Region', visible: true, order: 5 },
-  { field: 'industry', label: 'Industry', visible: false, order: 6 },
-  { field: 'contact_source', label: 'Source', visible: true, order: 7 },
-  { field: 'linkedin', label: 'LinkedIn', visible: false, order: 8 },
-  { field: 'website', label: 'Website', visible: false, order: 9 },
-  { field: 'tags', label: 'Tags', visible: false, order: 12 },
-  { field: 'engagement_score', label: 'Engagement Score', visible: false, order: 13 },
-  { field: 'email_opens', label: 'Email Opens', visible: false, order: 14 },
-  { field: 'email_clicks', label: 'Email Clicks', visible: false, order: 15 },
-  { field: 'last_contacted_at', label: 'Last Contacted', visible: false, order: 16 },
-  { field: 'created_time', label: 'Created Date', visible: false, order: 17 },
-  { field: 'contact_owner', label: 'Contact Owner', visible: true, order: 18 },
+  { field: 'contact_source', label: 'Source', visible: true, order: 5 },
+  { field: 'linkedin', label: 'LinkedIn', visible: false, order: 6 },
+  { field: 'tags', label: 'Tags', visible: false, order: 7 },
+  { field: 'last_contacted_at', label: 'Last Contacted', visible: false, order: 8 },
+  { field: 'created_time', label: 'Created Date', visible: false, order: 9 },
+  { field: 'contact_owner', label: 'Contact Owner', visible: true, order: 10 },
 ];
 
 export const ContactColumnCustomizer = ({
