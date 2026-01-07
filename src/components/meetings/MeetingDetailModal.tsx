@@ -33,6 +33,7 @@ import {
   History
 } from "lucide-react";
 import { format } from "date-fns";
+import { formatDateTimeStandard } from "@/utils/formatUtils";
 import { useUserDisplayNames } from "@/hooks/useUserDisplayNames";
 import { getMeetingStatus } from "@/utils/meetingStatus";
 import { MeetingFollowUpsSection } from "./MeetingFollowUpsSection";
@@ -405,7 +406,7 @@ export const MeetingDetailModal = ({
                 {meeting.created_at && (
                   <span className="flex items-center gap-1">
                     <Clock className="h-3 w-3" />
-                    Created: {format(new Date(meeting.created_at), 'dd/MM/yyyy')}
+                    Created: {formatDateTimeStandard(meeting.created_at)}
                   </span>
                 )}
               </div>
