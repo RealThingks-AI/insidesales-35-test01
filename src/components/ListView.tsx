@@ -11,6 +11,7 @@ import { Search, Filter, X, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, Brief
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RowActionsDropdown, Edit, Trash2, CheckSquare } from "./RowActionsDropdown";
 import { format } from "date-fns";
+import { formatDateTimeStandard } from "@/utils/formatUtils";
 import { DealColumnCustomizer, DealColumnConfig, defaultDealColumns } from "./DealColumnCustomizer";
 import { BulkActionsBar } from "./BulkActionsBar";
 import { DealsAdvancedFilter, AdvancedFilterState } from "./DealsAdvancedFilter";
@@ -159,11 +160,7 @@ export const ListView = ({
 
   const formatDate = (date: string | undefined) => {
     if (!date) return '-';
-    try {
-      return format(new Date(date), 'dd/MM/yyyy');
-    } catch {
-      return '-';
-    }
+    return formatDateTimeStandard(date) || '-';
   };
 
   // Stage badge styling (matching Accounts module)

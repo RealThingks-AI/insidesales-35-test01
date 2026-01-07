@@ -30,6 +30,7 @@ import { ClearFiltersButton } from "./shared/ClearFiltersButton";
 import { TableSkeleton } from "./shared/Skeletons";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { moveFieldToEnd } from "@/utils/columnOrderUtils";
+import { formatDateTimeStandard } from "@/utils/formatUtils";
 
 // Export ref interface for parent component
 export interface LeadTableRef {
@@ -760,6 +761,12 @@ const LeadTable = forwardRef<LeadTableRef, LeadTableProps>(({
                           ) : column.field === 'position' ? (
                             lead.position ? (
                               <HighlightedText text={lead.position} highlight={debouncedSearchTerm} />
+                            ) : (
+                              <span className="text-center text-muted-foreground w-full block">-</span>
+                            )
+                          ) : column.field === 'created_time' || column.field === 'modified_time' ? (
+                            lead[column.field as keyof Lead] ? (
+                              <span className="text-sm">{formatDateTimeStandard(lead[column.field as keyof Lead] as string)}</span>
                             ) : (
                               <span className="text-center text-muted-foreground w-full block">-</span>
                             )

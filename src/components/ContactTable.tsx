@@ -30,6 +30,7 @@ import { ClearFiltersButton } from "./shared/ClearFiltersButton";
 import { TableSkeleton } from "./shared/Skeletons";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { moveFieldToEnd } from "@/utils/columnOrderUtils";
+import { formatDateTimeStandard } from "@/utils/formatUtils";
 
 // Export ref interface for parent component
 export interface ContactTableRef {
@@ -512,6 +513,10 @@ export const ContactTable = forwardRef<ContactTableRef, ContactTableProps>(({
     } else if (columnField === 'created_by') {
       if (!contact.created_by) return '-';
       return displayNames[contact.created_by] || "Loading...";
+    } else if (columnField === 'created_time' || columnField === 'modified_time') {
+      const dateValue = contact[columnField as keyof Contact];
+      if (!dateValue) return '-';
+      return formatDateTimeStandard(dateValue as string);
     }
     return contact[columnField as keyof Contact] || '-';
   };
@@ -757,7 +762,7 @@ export const ContactTable = forwardRef<ContactTableRef, ContactTableProps>(({
                           <span className="text-center w-full block">{contact.email_clicks ?? 0}</span>
                         ) : column.field === 'last_contacted_at' ? (
                           contact.last_contacted_at ? (
-                            <span className="text-sm">{new Date(contact.last_contacted_at).toLocaleDateString()}</span>
+                            <span className="text-sm">{formatDateTimeStandard(contact.last_contacted_at)}</span>
                           ) : (
                             <span className="text-center text-muted-foreground w-full block">-</span>
                           )
