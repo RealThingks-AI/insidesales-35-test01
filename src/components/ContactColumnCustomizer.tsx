@@ -50,24 +50,34 @@ export const ContactColumnCustomizer = ({
   onSave,
   isSaving = false,
 }: ContactColumnCustomizerProps) => {
-  const [localColumns, setLocalColumns] = useState<ContactColumnConfig[]>(columns);
+  // Initialize local columns only when dialog opens
+  const [localColumns, setLocalColumns] = useState<ContactColumnConfig[]>([]);
+  const [isInitialized, setIsInitialized] = useState(false);
 
-  // Sync local columns when props change, merging new columns if they don't exist
+  // Sync local columns only when dialog opens (not on every columns prop change)
   useEffect(() => {
-    const existingFields = new Set(columns.map(c => c.field));
-    const missingColumns = defaultContactColumns.filter(dc => !existingFields.has(dc.field));
-    
-    // Filter out invalid columns that are not in the default columns list
-    const validColumns = columns.filter(c => 
-      defaultContactColumns.some(dc => dc.field === c.field)
-    );
-    
-    if (missingColumns.length > 0 || validColumns.length !== columns.length) {
-      setLocalColumns([...validColumns, ...missingColumns]);
-    } else {
-      setLocalColumns(columns);
+    if (open && !isInitialized) {
+      const existingFields = new Set(columns.map(c => c.field));
+      const missingColumns = defaultContactColumns.filter(dc => !existingFields.has(dc.field));
+      
+      // Filter out invalid columns that are not in the default columns list
+      const validColumns = columns.filter(c => 
+        defaultContactColumns.some(dc => dc.field === c.field)
+      );
+      
+      if (missingColumns.length > 0 || validColumns.length !== columns.length) {
+        setLocalColumns([...validColumns, ...missingColumns]);
+      } else {
+        setLocalColumns(columns);
+      }
+      setIsInitialized(true);
     }
-  }, [columns]);
+    
+    // Reset initialization flag when dialog closes
+    if (!open) {
+      setIsInitialized(false);
+    }
+  }, [open, columns, isInitialized]);
 
   const handleVisibilityChange = (field: string, visible: boolean) => {
     const updatedColumns = localColumns.map(col =>
