@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useUserDisplayNames } from "@/hooks/useUserDisplayNames";
 import { useMeetingsImportExport } from "@/hooks/useMeetingsImportExport";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Search, Video, Trash2, Edit, Calendar, ArrowUpDown, ArrowUp, ArrowDown, List, CalendarDays, CheckCircle2, AlertCircle, UserX, CalendarClock, User, Columns, Upload, Download, X, Eye } from "lucide-react";
+import { Plus, Search, Video, Trash2, Edit, Calendar, ArrowUpDown, ArrowUp, ArrowDown, List, CalendarDays, CheckCircle2, AlertCircle, UserX, CalendarClock, User, Columns, Upload, Download, X, Eye, CheckSquare } from "lucide-react";
 import { RowActionsDropdown } from "@/components/RowActionsDropdown";
 import { HighlightedText } from "@/components/shared/HighlightedText";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -24,6 +24,7 @@ import { TablePagination } from "@/components/shared/TablePagination";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { getMeetingStatus } from "@/utils/meetingStatus";
+import { MeetingDetailModal } from "@/components/meetings/MeetingDetailModal";
 
 type SortColumn = 'subject' | 'date' | 'time' | 'lead_contact' | 'status' | null;
 type SortDirection = 'asc' | 'desc';
@@ -38,6 +39,8 @@ interface Meeting {
   attendees?: unknown;
   lead_id?: string | null;
   contact_id?: string | null;
+  account_id?: string | null;
+  deal_id?: string | null;
   created_by?: string | null;
   created_at?: string | null;
   status: string;
@@ -59,13 +62,12 @@ const Meetings = () => {
   const {
     toast
   } = useToast();
-  const [meetings, setMeetings] = useState<Meeting[]>([]);
-  const [filteredMeetings, setFilteredMeetings] = useState<Meeting[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  // Removed filteredMeetings state - using sortedAndFilteredMeetings directly
   const [searchTerm, setSearchTerm] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [editingMeeting, setEditingMeeting] = useState<Meeting | null>(null);
-  const [viewingMeetingId, setViewingMeetingId] = useState<string | null>(null);
+  const [viewingMeeting, setViewingMeeting] = useState<Meeting | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [meetingToDelete, setMeetingToDelete] = useState<string | null>(null);
   const [selectedMeetings, setSelectedMeetings] = useState<string[]>([]);
@@ -82,6 +84,18 @@ const Meetings = () => {
   // Column customizer state
   const [showColumnCustomizer, setShowColumnCustomizer] = useState(false);
   const [columns, setColumns] = useState<MeetingColumnConfig[]>(defaultMeetingColumns);
+
+  const handleCreateTask = (meeting: Meeting) => {
+    const params = new URLSearchParams({
+      create: '1',
+      module: 'meetings',
+      recordId: meeting.id,
+      recordName: encodeURIComponent(meeting.subject || 'Meeting'),
+      return: '/meetings',
+      returnViewId: meeting.id,
+    });
+    navigate(`/tasks?${params.toString()}`);
+  };
 
   // Get owner parameter from URL - "me" means filter by current user
   const ownerParam = searchParams.get('owner');
@@ -108,6 +122,49 @@ const Meetings = () => {
     }
   }, [searchParams]);
 
+  // viewId effect is moved below the meetings query
+
+  // Fetch all profiles for organizer dropdown with caching
+  const { data: allProfiles = [] } = useQuery({
+    queryKey: ['all-profiles'],
+    queryFn: async () => {
+      const { data } = await supabase.from('profiles').select('id, full_name');
+      return data || [];
+    },
+    staleTime: 10 * 60 * 1000, // 10 minutes
+  });
+
+  // Fetch meetings with React Query caching
+  const { data: meetings = [], isLoading: loading, refetch: refetchMeetings } = useQuery({
+    queryKey: ['meetings'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('meetings').select(`
+          *,
+          leads:lead_id (lead_name),
+          contacts:contact_id (contact_name)
+        `).order('start_time', {
+        ascending: true
+      });
+      if (error) throw error;
+      return (data || []).map(meeting => ({
+        ...meeting,
+        lead_name: meeting.leads?.lead_name,
+        contact_name: meeting.contacts?.contact_name
+      })) as Meeting[];
+    },
+    staleTime: 2 * 60 * 1000, // 2 minutes
+  });
+
+  const fetchMeetings = () => {
+    refetchMeetings();
+  };
+
+  // Get organizer display names
+  const organizerIds = useMemo(() => {
+    return [...new Set(meetings.map(m => m.created_by).filter(Boolean))] as string[];
+  }, [meetings]);
+  const { displayNames: organizerNames } = useUserDisplayNames(organizerIds);
+
   // Handle viewId from URL (from global search)
   useEffect(() => {
     const viewId = searchParams.get('viewId');
@@ -116,7 +173,6 @@ const Meetings = () => {
       if (meetingToView) {
         setEditingMeeting(meetingToView);
         setShowModal(true);
-        // Clear the viewId from URL after opening
         setSearchParams(prev => {
           prev.delete('viewId');
           return prev;
@@ -124,58 +180,6 @@ const Meetings = () => {
       }
     }
   }, [searchParams, meetings, setSearchParams]);
-
-  // Fetch all profiles for organizer dropdown
-  const { data: allProfiles = [] } = useQuery({
-    queryKey: ['all-profiles'],
-    queryFn: async () => {
-      const { data } = await supabase.from('profiles').select('id, full_name');
-      return data || [];
-    },
-  });
-
-  // Get organizer display names
-  const organizerIds = useMemo(() => {
-    return [...new Set(meetings.map(m => m.created_by).filter(Boolean))] as string[];
-  }, [meetings]);
-  const { displayNames: organizerNames } = useUserDisplayNames(organizerIds);
-
-  const fetchMeetings = async () => {
-    try {
-      setLoading(true);
-      const {
-        data,
-        error
-      } = await supabase.from('meetings').select(`
-          *,
-          leads:lead_id (lead_name),
-          contacts:contact_id (contact_name)
-        `).order('start_time', {
-        ascending: true
-      });
-      if (error) throw error;
-      const transformedData = (data || []).map(meeting => ({
-        ...meeting,
-        lead_name: meeting.leads?.lead_name,
-        contact_name: meeting.contacts?.contact_name
-      }));
-      setMeetings(transformedData);
-      setSelectedMeetings([]);
-    } catch (error) {
-      console.error('Error fetching meetings:', error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch meetings",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchMeetings();
-  }, []);
 
   const getEffectiveStatus = (meeting: Meeting) => {
     return getMeetingStatus(meeting);
@@ -242,17 +246,20 @@ const Meetings = () => {
     return filtered;
   }, [meetings, searchTerm, statusFilter, organizerFilter, sortColumn, sortDirection]);
 
-  useEffect(() => {
-    setFilteredMeetings(sortedAndFilteredMeetings);
-    setCurrentPage(1); // Reset to first page when filters change
-  }, [sortedAndFilteredMeetings]);
+  // Reset to first page when filters change (without storing filtered in state)
+  const prevFilterKey = useRef('');
+  const filterKey = `${searchTerm}-${statusFilter}-${organizerFilter}`;
+  if (filterKey !== prevFilterKey.current) {
+    prevFilterKey.current = filterKey;
+    if (currentPage !== 1) setCurrentPage(1);
+  }
 
-  // Pagination calculations
-  const totalPages = Math.ceil(filteredMeetings.length / ITEMS_PER_PAGE);
+  // Use sortedAndFilteredMeetings directly instead of storing in state
+  const totalPages = Math.ceil(sortedAndFilteredMeetings.length / ITEMS_PER_PAGE);
   const paginatedMeetings = useMemo(() => {
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    return filteredMeetings.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-  }, [filteredMeetings, currentPage]);
+    return sortedAndFilteredMeetings.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  }, [sortedAndFilteredMeetings, currentPage]);
 
   const handleDelete = async (id: string) => {
     try {
@@ -420,14 +427,8 @@ const Meetings = () => {
     }
   };
 
-  if (loading) {
-    return <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading meetings...</p>
-        </div>
-      </div>;
-  }
+  // Show skeleton instead of blocking full-screen loader
+  const showSkeleton = loading && meetings.length === 0;
 
   return <div className="h-screen flex flex-col bg-background overflow-hidden">
       {/* Hidden file input for import */}
@@ -487,7 +488,7 @@ const Meetings = () => {
                     <Upload className="h-4 w-4 mr-2" />
                     {isImporting ? 'Importing...' : 'Import CSV'}
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleExport(filteredMeetings)} disabled={isExporting || filteredMeetings.length === 0}>
+                  <DropdownMenuItem onClick={() => handleExport(sortedAndFilteredMeetings)} disabled={isExporting || sortedAndFilteredMeetings.length === 0}>
                     <Download className="h-4 w-4 mr-2" />
                     {isExporting ? 'Exporting...' : 'Export CSV'}
                   </DropdownMenuItem>
@@ -514,11 +515,25 @@ const Meetings = () => {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 min-h-0 overflow-auto px-4 pt-2 pb-4">
-        {viewMode === 'calendar' ? <MeetingsCalendarView meetings={filteredMeetings} onMeetingClick={meeting => {
-        setEditingMeeting(meeting);
-        setShowModal(true);
-      }} onMeetingUpdated={fetchMeetings} /> : <div className="space-y-3">
+      <div className="flex-1 min-h-0 overflow-hidden px-4 pt-2 pb-4 flex flex-col">
+        {showSkeleton ? (
+          <div className="space-y-4 flex-1">
+            <div className="h-10 bg-muted animate-pulse rounded" />
+            <div className="h-64 bg-muted animate-pulse rounded" />
+          </div>
+        ) : viewMode === 'calendar' ? (
+          <div className="flex-1 min-h-0 overflow-auto">
+            <MeetingsCalendarView
+              meetings={sortedAndFilteredMeetings}
+              onMeetingClick={(meeting) => {
+                setEditingMeeting(meeting);
+                setShowModal(true);
+              }}
+              onMeetingUpdated={fetchMeetings}
+            />
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3 flex-1 min-h-0">
             {/* Search and Bulk Actions */}
             <div className="flex items-center gap-4 flex-wrap">
               <div className="relative w-64">
@@ -575,7 +590,7 @@ const Meetings = () => {
 
             {/* Table */}
             <Card className="flex-1 min-h-0 flex flex-col">
-              <div className="relative overflow-auto flex-1">
+              <div className="relative overflow-auto flex-1 min-h-0">
               <Table>
                 <TableHeader>
                   <TableRow className="sticky top-0 z-20 bg-muted border-b-2">
@@ -666,7 +681,7 @@ const Meetings = () => {
                           <TableCell className="px-4 py-3">
                             {meeting.lead_name && <div>Lead: {meeting.lead_name}</div>}
                             {meeting.contact_name && <div>Contact: {meeting.contact_name}</div>}
-                            {!meeting.lead_name && !meeting.contact_name && <span className="text-muted-foreground">—</span>}
+                            {!meeting.lead_name && !meeting.contact_name && <span className="text-center text-muted-foreground w-full block">-</span>}
                           </TableCell>
                         )}
                         {isColumnVisible('status') && <TableCell className="px-4 py-3">{getStatusBadge(meeting)}</TableCell>}
@@ -688,18 +703,22 @@ const Meetings = () => {
                                  'Join Meeting'}
                               </a>
                             ) : (
-                              <span className="text-muted-foreground">—</span>
+                              <span className="text-center text-muted-foreground w-full block">-</span>
                             )}
                           </TableCell>
                         )}
                         {isColumnVisible('organizer') && (
                           <TableCell className="px-4 py-3">
-                            <div className="flex items-center gap-1 text-sm">
-                              <User className="h-3 w-3 text-muted-foreground" />
-                              <span className="truncate max-w-[120px]">
-                                {meeting.created_by ? organizerNames[meeting.created_by] || 'Loading...' : '-'}
-                              </span>
-                            </div>
+                            {meeting.created_by ? (
+                              <div className="flex items-center gap-1 text-sm">
+                                <User className="h-3 w-3 text-muted-foreground" />
+                                <span className="truncate max-w-[120px]">
+                                  {organizerNames[meeting.created_by] || 'Loading...'}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-center text-muted-foreground w-full block">-</span>
+                            )}
                           </TableCell>
                         )}
                         <TableCell className="w-20 px-4 py-3">
@@ -710,8 +729,7 @@ const Meetings = () => {
                                   label: "View",
                                   icon: <Eye className="w-4 h-4" />,
                                   onClick: () => {
-                                    setEditingMeeting(meeting);
-                                    setShowModal(true);
+                                    setViewingMeeting(meeting);
                                   }
                                 },
                                 {
@@ -721,6 +739,11 @@ const Meetings = () => {
                                     setEditingMeeting(meeting);
                                     setShowModal(true);
                                   }
+                                },
+                                {
+                                  label: "Create Task",
+                                  icon: <CheckSquare className="w-4 h-4" />,
+                                  onClick: () => handleCreateTask(meeting)
                                 },
                                 {
                                   label: "Delete",
@@ -742,28 +765,27 @@ const Meetings = () => {
               </div>
               
               {/* Pagination */}
-              {totalPages > 0 && (
-                <div className="flex items-center justify-between p-4 border-t">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-muted-foreground">
-                      Showing {filteredMeetings.length === 0 ? 0 : (currentPage - 1) * ITEMS_PER_PAGE + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, filteredMeetings.length)} of {filteredMeetings.length} meetings
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} disabled={currentPage === 1}>
-                      Previous
-                    </Button>
-                    <span className="text-sm">
-                      Page {currentPage} of {totalPages || 1}
-                    </span>
-                    <Button variant="outline" size="sm" onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} disabled={currentPage === totalPages}>
-                      Next
-                    </Button>
-                  </div>
+              <div className="flex items-center justify-between p-4 border-t">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">
+                    Showing {sortedAndFilteredMeetings.length === 0 ? 0 : (currentPage - 1) * ITEMS_PER_PAGE + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, sortedAndFilteredMeetings.length)} of {sortedAndFilteredMeetings.length} meetings
+                  </span>
                 </div>
-              )}
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} disabled={currentPage === 1 || totalPages === 0}>
+                    Previous
+                  </Button>
+                  <span className="text-sm">
+                    Page {currentPage} of {totalPages || 1}
+                  </span>
+                  <Button variant="outline" size="sm" onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} disabled={currentPage === totalPages || totalPages === 0}>
+                    Next
+                  </Button>
+                </div>
+              </div>
             </Card>
-          </div>}
+          </div>
+        )}
       </div>
 
       {/* Modals */}
@@ -771,6 +793,18 @@ const Meetings = () => {
       fetchMeetings();
       setEditingMeeting(null);
     }} />
+
+      <MeetingDetailModal 
+        open={!!viewingMeeting} 
+        onOpenChange={(open) => !open && setViewingMeeting(null)} 
+        meeting={viewingMeeting}
+        onEdit={(meeting) => {
+          setViewingMeeting(null);
+          setEditingMeeting(meeting);
+          setShowModal(true);
+        }}
+        onUpdate={fetchMeetings}
+      />
 
       <MeetingColumnCustomizer
         open={showColumnCustomizer}
@@ -821,6 +855,7 @@ const Meetings = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
     </div>;
 };
 export default Meetings;
