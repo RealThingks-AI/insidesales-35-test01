@@ -194,7 +194,16 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    console.log("Starting send-task-reminders function...");
+    // Check for force parameter to bypass time check
+    let forceRun = false;
+    try {
+      const body = await req.json();
+      forceRun = body?.force === true;
+    } catch {
+      // No body or invalid JSON, default to false
+    }
+
+    console.log(`Starting send-task-reminders function... (force: ${forceRun})`);
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -290,33 +299,37 @@ const handler = async (req: Request): Promise<Response> => {
       // Get user's timezone (default to Asia/Kolkata)
       const userTimezone = profile?.timezone || "Asia/Kolkata";
       
-      // Check if it's 9 AM in user's timezone (9:00-9:59)
-      const userHour = getCurrentHourInTimezone(userTimezone);
-      if (userHour !== 9) {
-        console.log(`Skipping user ${userId} - not 9 AM in ${userTimezone} (current hour: ${userHour})`);
-        emailResults.push({ userId, success: false, skipped: `not_9am_hour_${userHour}` });
-        continue;
+      // Check if it's 9 AM in user's timezone (9:00-9:59) - skip if force is true
+      if (!forceRun) {
+        const userHour = getCurrentHourInTimezone(userTimezone);
+        if (userHour !== 9) {
+          console.log(`Skipping user ${userId} - not 9 AM in ${userTimezone} (current hour: ${userHour})`);
+          emailResults.push({ userId, success: false, skipped: `not_9am_hour_${userHour}` });
+          continue;
+        }
       }
 
       // Get today's date in user's timezone for duplicate check
       const userTodayDate = getTodayInTimezone(userTimezone);
 
-      // Check if already sent today
-      const { data: existingLog, error: logError } = await supabase
-        .from("task_reminder_logs")
-        .select("id")
-        .eq("user_id", userId)
-        .eq("sent_date", userTodayDate)
-        .maybeSingle();
+      // Check if already sent today (skip check if force is true)
+      if (!forceRun) {
+        const { data: existingLog, error: logError } = await supabase
+          .from("task_reminder_logs")
+          .select("id")
+          .eq("user_id", userId)
+          .eq("sent_date", userTodayDate)
+          .maybeSingle();
 
-      if (logError) {
-        console.error(`Error checking reminder log for ${userId}:`, logError);
-      }
+        if (logError) {
+          console.error(`Error checking reminder log for ${userId}:`, logError);
+        }
 
-      if (existingLog) {
-        console.log(`Skipping user ${userId} - already sent today (${userTodayDate})`);
-        emailResults.push({ userId, success: false, skipped: "already_sent_today" });
-        continue;
+        if (existingLog) {
+          console.log(`Skipping user ${userId} - already sent today (${userTodayDate})`);
+          emailResults.push({ userId, success: false, skipped: "already_sent_today" });
+          continue;
+        }
       }
 
       // Get user's tasks
@@ -342,13 +355,23 @@ const handler = async (req: Request): Promise<Response> => {
         const emailHtml = generateEmailHtml(userTasksData, appUrl);
         const taskCount = userTodayTasks.length + userOverdueTasks.length;
         
+        // Get sender email from environment
+        const senderEmail = Deno.env.get("AZURE_SENDER_EMAIL") || Deno.env.get("DEFAULT_SENDER_EMAIL");
+        
+        if (!senderEmail) {
+          console.error("No sender email configured (AZURE_SENDER_EMAIL or DEFAULT_SENDER_EMAIL)");
+          emailResults.push({ userId, success: false, error: "No sender email configured" });
+          continue;
+        }
+        
         // Call the existing send-email edge function
         const { error: emailError } = await supabase.functions.invoke("send-email", {
           body: {
             to: email,
             subject: `📋 You have ${taskCount} task${taskCount !== 1 ? "s" : ""} to complete today`,
-            html: emailHtml,
-            recipientName: userTasksData.fullName,
+            body: emailHtml,
+            toName: userTasksData.fullName,
+            from: senderEmail,
           },
         });
 
