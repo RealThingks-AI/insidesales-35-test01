@@ -41,3 +41,6 @@ verify_jwt = false
 
 [functions.send-task-reminders]
 verify_jwt = false
+
+[functions.send-task-notification]
+verify_jwt = false
